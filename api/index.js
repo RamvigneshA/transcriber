@@ -1,13 +1,7 @@
 require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
-const { google } = require('googleapis');
-
-const youtube = google.youtube('v3');
-const API_KEY = process.env.YOUTUBE_API_KEY; // You'll need to set this in your environment variables
-
-// Verify API key is loaded
-console.log('API Key loaded:', !!process.env.YOUTUBE_API_KEY);
+const getSubtitles = require('youtube-captions-scraper').getSubtitles;
 
 const app = express();
 app.use(cors());
@@ -20,26 +14,17 @@ app.get("/api/transcript", async (req, res) => {
     }
 
     try {
-        const response = await youtube.captions.list({
-          key: API_KEY,
-          part: 'snippet',
-          videoId: videoId,
+        const captions = await getSubtitles({
+          videoID: videoId,
+          lang: 'en', // get English captions
         });
-
-        if (response.data.items && response.data.items.length > 0) {
-          const captionId = response.data.items[0].id;
-          const transcript = await youtube.captions.download({
-            key: API_KEY,
-            id: captionId,
-          });
-
-          res.json({
-            videoId,
-            transcript: transcript.data,
-          });
-        } else {
-          throw new Error('No captions found for this video');
-        }
+        
+        const text = captions.map((caption) => caption.text).join(' ');
+        res.json({
+          videoId,
+          transcript: text,
+          segments: captions, // including the timestamped segments
+        });
     } catch (error) {
         res.status(500).json({
           error: 'Failed to fetch transcript',
